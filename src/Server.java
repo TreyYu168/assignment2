@@ -3,45 +3,70 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.spi.SelectorProvider;
+import java.nio.channels.SocketChannel;
 import java.util.Iterator;
-import java.util.Set;
 
 public class Server {
 
     private int portNum;
-    private int numOfThreads;
-    private ThreadPoolManager threadPool;
+    private JobQueueManager jobQueueManager;
     private Selector selector;
+    private ThreadPool threadPool;
 
     public Server(int portNum, int numOfThreads) throws IOException{
         this.portNum = portNum;
-        this.numOfThreads = numOfThreads;
-        this.threadPool = new ThreadPoolManager(this.numOfThreads);
+        this.jobQueueManager = new JobQueueManager();
         Selector selector = Selector.open();
         this.selector = selector;
+        this.threadPool = new ThreadPool(jobQueueManager, numOfThreads);
 
     }
     private void startServer() throws IOException {
         // Create a Selector
+        threadPool.startThreadPool();
 
         ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.configureBlocking(false);
         serverSocketChannel.socket().bind(new InetSocketAddress(portNum));
-        SelectionKey socketChannel = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-        while (true) {
-            // wait for events
-            //this.selector.select();
-            // wake up to work on selected keys
-            //Iterator keys = this.selector.selectedKeys().iterator();
-            //while (keys.hasNext()) {
-                //more housekeeping
-//                if (key.isAcceptable ()) {
-//                    this.accept(key);
-//            }
-        }
-/*other cases such as isReadable() and isWriteable() not shown*/
-//            } }}
+        serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        while(true) {
+
+            this.selector.select();
+
+            Iterator keys = this.selector.selectedKeys().iterator();
+
+            while (keys.hasNext()) {
+                SelectionKey key = (SelectionKey) keys.next();
+
+                if (key.isAcceptable ()) {
+                    this.accept(key);
+                    keys.remove();
+                }
+
+                if (key.isReadable()) {
+                    this.read(key);
+                    keys.remove();
+                }
+            }
+        /*other cases such as isReadable() and isWriteable() not shown*/
+      }
+    }
+
+    private void accept(SelectionKey key) throws IOException {
+        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
+
+        SocketChannel socketChannel = serverSocketChannel.accept();
+        socketChannel.configureBlocking(false);
+        socketChannel.register(this.selector, SelectionKey.OP_READ);
+
+    }
+
+    private void read(SelectionKey key) throws IOException {
+        key.interestOps(SelectionKey.OP_WRITE);
+        ServerTask serverTask = new ServerTask(key);
+
+        jobQueueManager.addToQueue(serverTask);
     }
 
     public static void main(String[] args) {
@@ -51,11 +76,13 @@ public class Server {
         try {
 
             Server server = new Server(port, numOfThreads);
-            System.out.println(server.threadPool.toString());
-            server.threadPool.startThreadPool();
+            //System.out.println(server.threadPool.toString());
+            //server.threadPool.startThreadPool();
+            System.out.println("Server Starting");
+            server.startServer();
 
         } catch(IOException ioe) {
-            System.out.println("Interrupted Exception caught: " + ioe.getMessage());
+            System.out.println("Server Main: Interrupted Exception caught: " + ioe.getMessage());
         }
 
     }
