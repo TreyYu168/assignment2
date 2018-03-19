@@ -42,7 +42,6 @@ public class HashVerifier implements Runnable{
                 String hash = getFromReceive();
 
                 if(sentHash.removeFirstOccurrence(hash)) {
-                    System.out.println("Confirmed");
                 } else {
                     System.out.println("Hash Does Not Exist");
                 }

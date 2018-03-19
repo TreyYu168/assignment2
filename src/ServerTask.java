@@ -4,21 +4,18 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 
 public class ServerTask implements Runnable{
 
     private SelectionKey selectionKey;
     private SocketChannel socketChannel;
     private ByteBuffer byteBuffer;
-    private int test = 0;
 
     public ServerTask(SelectionKey key) {
         this.selectionKey = key;
         this.socketChannel = (SocketChannel)key.channel();
 
     }
-
 
     private void read() throws IOException {
 

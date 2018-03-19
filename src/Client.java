@@ -21,6 +21,8 @@ public class Client {
     private Selector selector;
     private ByteBuffer buffer;
     private HashVerifier hashVerifier;
+    private ClientStatTask clientStatTask;
+    private Thread clientStatThread;
 
     public Client(String hostname, int portNum, int messageRate) throws IOException {
         this.hostname = hostname;
@@ -30,16 +32,18 @@ public class Client {
         this.selector = selector;
         this.buffer = ByteBuffer.allocate(20);
         this.hashVerifier = new HashVerifier();
+        this.clientStatTask = new ClientStatTask();
+        this.clientStatThread = new Thread(clientStatTask);
     }
 
     private void startClient() throws IOException {
 
-        System.out.println("I'm Starting");
         SocketChannel socketChannel = SocketChannel.open();
         socketChannel.configureBlocking(false);
         socketChannel.register(selector, SelectionKey.OP_CONNECT);
         socketChannel.connect(new InetSocketAddress(hostname, portNum));
         Thread hashThread = new Thread(this.hashVerifier);
+        clientStatThread.start();
         hashThread.start();
 
 
@@ -83,10 +87,12 @@ public class Client {
 
     private void write(SelectionKey key) {
 
-        ClientTask clientTask = new ClientTask(key, this.messageRate, this.hashVerifier);
+        ClientTask clientTask = new ClientTask(key, this.messageRate, this.hashVerifier, this.clientStatTask);
 
         Thread write = new Thread(clientTask);
+
         write.start();
+
 
         key.interestOps(SelectionKey.OP_READ);
     }
@@ -97,6 +103,8 @@ public class Client {
 
         this.buffer.clear();
         socketChannel.read(this.buffer);
+        clientStatTask.incrementRead();
+
         hashVerifier.addToReceive(Arrays.toString(this.buffer.array()));
 
     }

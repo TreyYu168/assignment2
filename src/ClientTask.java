@@ -13,12 +13,14 @@ public class ClientTask implements Runnable{
     private SocketChannel socketChannel;
     private int sleepRate;
     private HashVerifier hashVerifier;
+    private ClientStatTask clientStatTask;
 
-    public ClientTask(SelectionKey key, int messageRate, HashVerifier hashVerifier) {
+    public ClientTask(SelectionKey key, int messageRate, HashVerifier hashVerifier, ClientStatTask clientStatTask) {
         this.selectionKey = key;
         this.socketChannel = (SocketChannel)key.channel();
         this.sleepRate = 1000 / messageRate;
         this.hashVerifier = hashVerifier;
+        this.clientStatTask = clientStatTask;
     }
 
     private byte[] createRandom() {
@@ -60,7 +62,7 @@ public class ClientTask implements Runnable{
         while(true) {
 
             this.write();
-
+            clientStatTask.incrementWrite();
             try {
                 Thread.sleep(sleepRate);
             } catch(InterruptedException ie) {
