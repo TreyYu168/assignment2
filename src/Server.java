@@ -4,6 +4,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.Iterator;
 
 public class Server {
@@ -12,6 +13,9 @@ public class Server {
     private JobQueueManager jobQueueManager;
     private Selector selector;
     private ThreadPool threadPool;
+    private HashMap<SocketChannel, Integer> clientThroughput;
+    private ServerStatTask serverStatTask;
+    private Thread serverStatThread;
 
     public Server(int portNum, int numOfThreads) throws IOException{
         this.portNum = portNum;
@@ -19,11 +23,15 @@ public class Server {
         Selector selector = Selector.open();
         this.selector = selector;
         this.threadPool = new ThreadPool(jobQueueManager, numOfThreads);
-
+        this.clientThroughput = new HashMap<>();
+        this.serverStatTask = new ServerStatTask(this.clientThroughput);
+        this.serverStatThread = new Thread(serverStatTask);
     }
+
     private void startServer() throws IOException {
         // Create a Selector
         threadPool.startThreadPool();
+        serverStatThread.start();
 
         ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.configureBlocking(false);
@@ -58,15 +66,22 @@ public class Server {
 
         SocketChannel socketChannel = serverSocketChannel.accept();
         socketChannel.configureBlocking(false);
+
+        serverStatTask.addSocketChannel(socketChannel);
+
         socketChannel.register(this.selector, SelectionKey.OP_READ);
 
     }
 
     private void read(SelectionKey key) throws IOException {
+        SocketChannel socketChannel = (SocketChannel)key.channel();
+
         key.interestOps(SelectionKey.OP_WRITE);
         ServerTask serverTask = new ServerTask(key);
 
         jobQueueManager.addToQueue(serverTask);
+        serverStatTask.incrementChannel(socketChannel);
+
     }
 
     public static void main(String[] args) {
@@ -78,7 +93,6 @@ public class Server {
             Server server = new Server(port, numOfThreads);
             //System.out.println(server.threadPool.toString());
             //server.threadPool.startThreadPool();
-            System.out.println("Server Starting");
             server.startServer();
 
         } catch(IOException ioe) {

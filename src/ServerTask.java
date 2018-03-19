@@ -11,6 +11,7 @@ public class ServerTask implements Runnable{
     private SelectionKey selectionKey;
     private SocketChannel socketChannel;
     private ByteBuffer byteBuffer;
+    private int test = 0;
 
     public ServerTask(SelectionKey key) {
         this.selectionKey = key;
@@ -40,7 +41,6 @@ public class ServerTask implements Runnable{
                 this.read();
                 byte[] byteArray = this.SHA1FromBytes(byteBuffer.array());
                 socketChannel.write(ByteBuffer.wrap(byteArray));
-                System.out.println("I've written to the socket: " + Arrays.toString(byteArray));
 
                 this.byteBuffer.clear();
 
